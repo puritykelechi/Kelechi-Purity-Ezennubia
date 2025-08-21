@@ -1,0 +1,90 @@
+####Class 1c practice exercise####
+
+#Task 1
+cholesterol = 230
+
+if(cholesterol > 240){
+  print("High Cholesterol")
+}else {
+    print("Normal Cholesterol")
+}
+
+
+#Task 2
+Systolic_bp = 130
+
+if(Systolic_bp < 120){
+  print("Blood Pressure is normal")
+}else {
+  print("Blood pressure is high")
+}
+
+
+####Working with patient_info.csv####
+#Task 3 - Automating Data Type Conversion with for loop
+
+#step 1 - read the data in csv format into R environment
+original_data = read.csv(file.choose())
+
+#Step 2 - create a copy of original data with the name modified data
+modified_data = original_data
+
+####Converting the categorical or character columns gender, smoker and diagnosis into factor type####
+#Step 3 - store the columns names to be converted with for loop as one variable name e.g factor_cols
+factor_cols = c("gender", "smoker", "diagnosis")
+
+#Step 4 - Use for loop to convert all the columns in factor_cols to factor type
+for (col in factor_cols) {
+     modified_data[[col]] = as.factor(modified_data[[col]])
+}
+#Step 5 - check the structure of the modified data if its a factor
+str(modified_data)
+#check the structure of original data to compare it with the modified data
+str(original_data)
+
+
+#Task 4
+#Converting Factors to Numeric Codes
+
+binary_cols <- c("smoker")   # store column names in a vector
+#use ifelse() condition inside the loop to replace Yes with 1 and No with 0
+ for (col in binary_cols) {
+   modified_data[[col]] = ifelse(modified_data == "Yes", 1, "No", 0)
+}
+str(original_data)    
+str(modified_data)
+
+for (col in binary_cols) {
+  modified_data[[col]] = ifelse(smoker == "Yes", 1, "No", 0)
+}
+
+
+
+
+####Working with metadata.csv####
+#Task 3 - Automating Data Type Conversion with for loop
+original_data2 = read.csv(file.choose())
+str(original_data2)
+modified_data2 = original_data2
+factor_cols = c("height", "gender")
+for (col in factor_cols) {
+  modified_data2[[col]] = as.factor(modified_data2[[col]])
+}
+str(modified_data2)
+
+#Task 4
+#Converting Factors to Numeric Codes
+binary_cols <- c("height")
+
+for (col in binary_cols) {
+  modified_data2[[col]] <- ifelse(modified_data2[[col]] == "Tall", 2,
+                                  ifelse(modified_data2[[col]] == "Medium", 1,
+                                         ifelse(modified_data2[[col]] == "Short", 0, NA)))
+}
+View(modified_data2)
+binary_cols <- c("gender")
+
+for (col in binary_cols) {
+  modified_data2[[col]] <- ifelse(modified_data2[[col]] == "Male", 1, 0)
+}
+View(modified_data2)
