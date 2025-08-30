@@ -1,0 +1,61 @@
+#Import the data to be worked on#
+data1 = read.csv(file.choose())
+data2 = read.csv(file.choose())
+# Define the classification function
+classify_gene <- function(logFC, padj) {
+  if (logFC > 1 & padj < 0.05) {
+    return("Upregulated")
+  } else if (logFC < -1 & padj < 0.05) {
+    return("Downregulated")
+  } else {
+    return("Not_Significant")
+  }
+}
+# List of files to process
+files <- c("data_1.csv", "data_2.csv")
+
+# Define input folder where raw data is stored and output folder where clean files will be saved#
+input_dir <- "data" 
+output_dir <- "results"
+
+# Create Results folder if it doesn't exist
+if(!dir.exists(output_dir)){
+  dir.create(output_dir)
+}
+
+#Prepare empty list to store results in R
+result_list <- list()
+
+#Prepare a for loop to classify both data sets and return the values Upregulated, Downregulated and Not_significant
+for (file_names in files) {
+  cat("\nProcessing:", file_names, "\n")
+  
+  input_file_path <- file.path(input_dir, file_names)
+  
+  # Import dataset
+  data <- read.csv(input_file_path, header = TRUE)
+  cat("File imported. Checking for missing values... \n")
+  
+  #handling missing values
+  if("padj" %in% names(data)){
+    missing_count <- sum(is.na(data$padj))
+    
+    cat("Missing values in 'padj':", missing_count, "\n")
+    data$padj[is.na(data$padj)] <- 1
+ 
+  }
+ 
+  # Add the status column using mapply
+  data$status <- mapply(classify_gene, data$logFC, data$padj)
+  cat("gene has been classified successfully. \n")
+  
+  #save results in R
+  result_list[[file_names]] <- data
+  
+  #save results in results folder
+  output_file_path <- file.path(output_dir, file_names)
+  write.csv(data, output_file_path, row.names = FALSE)
+  cat("Results saved to:", output_file_path, "\n")
+  
+}
+getwd()
