@@ -1,0 +1,150 @@
+# Bioconductor provides R packages for analyzing omics data (genomics, transcriptomics, proteomics etc).
+if (!requireNamespace("BiocManager", quietly = TRUE)) 
+  install.packages("BiocManager")
+
+# Install Bioconductor packages
+BiocManager::install(c("GEOquery","affy","arrayQualityMetrics"))
+a
+
+# Load Required Libraries
+library(GEOquery)             # Download GEO datasets (series matrix, raw CEL files)
+library(affy)                 # Pre-processing of Affymetrix microarray data (RMA normalization)
+library(arrayQualityMetrics)  # QC reports for microarray data
+library(dplyr)                # Data manipulation
+library(limma)
+library(AnnotationDbi)        #Interface for annotation databases
+library(hgu133plus2.db)
+
+####Download Series Matrix files###
+# Series matrix files are preprocessed text files containing 
+# expression values, sample annotations, and probe information.
+# Reason: Useful for quick exploratory analysis when raw CEL files are not needed.
+
+gse_data <- getGEO("E-MTAB-8594", GSEMatrix = TRUE)
+BiocManager::install("ArrayExpress")
+library(ArrayExpress)
+ae_data <- ArrayExpress("E-MTAB-8594")
+View(ae_data)
+ae_data
+
+if (!requireNamespace("ArrayExpress", quietly = TRUE)) {
+  if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+  BiocManager::install("ArrayExpress")
+}
+ae_dir <- file.path(tempdir(), "E-MTAB-8594")
+dir.create(ae_dir, showWarnings = FALSE, recursive = TRUE)
+getAE("E-MTAB-8594", path = ae_dir, type = "processed", extract = TRUE, local = FALSE)
+
+
+
+
+##Started again with a new data set because the dataset i chose had no SDRF file###
+gse_data <- getGEO("GSE54129", GSEMatrix = TRUE)
+
+if (!requireNamespace("BiocManager", quietly = TRUE)) 
+  install.packages("BiocManager")
+BiocManager::install(c("GEOquery","affy","arrayQualityMetrics"))
+library(GEOquery)
+library(affy)      
+library(arrayQualityMetrics)  # QC reports for microarray data
+library(dplyr)                # Data manipulation
+library(limma)
+library(AnnotationDbi)        #Interface for annotation databases
+library(hgu133plus2.db)
+gse_data <- getGEO("GSE54129", GSEMatrix = TRUE)
+
+
+# Extract expression data#
+expression_data <- exprs(gse_data$GSE54129_series_matrix.txt.gz)
+#Extract feature data#
+feature_data <-  fData(gse_data$GSE54129_series_matrix.txt.gz)
+#Extract phenotype data#
+phenotype_data <-  pData(gse_data$GSE54129_series_matrix.txt.gz)
+
+# Check missing values in sample annotation
+sum(is.na(phenotype_data$source_name_ch1)) 
+
+#### Download Raw Data (CEL files) ####
+getGEOSuppFiles("GSE54129", baseDir = "Raw_Data", makeDirectory = TRUE)
+
+untar("Raw_Data/GSE54129_RAW.tar", exdir = "Raw_Data/CEL_Files")
+fs <- "Raw_Data/GSE54129_RAW.tar"
+file.info(fs)$size                     # sanity: should be > a few MB
+try(utils::untar(fs, list = TRUE)[1:10])  # can we list entries?
+untar("GSE54129_RAW.tar", exdir = "Raw_Data/CEL_Files")
+
+# Read CEL files into R as an AffyBatch object
+raw_data <- ReadAffy(celfile.path = "Raw_Data/CEL_Files")
+raw_data
+
+# ---------------------------------------------------
+#### Quality Control (QC) Before Pre-processing ####
+# ---------------------------------------------------
+arrayQualityMetrics(expressionset = raw_data,
+                    outdir = "Results/QC_Raw_Data",
+                    force = TRUE,
+                    do.logtransform = TRUE)
+
+# -------------------------------------------------------
+#### RMA (Robust Multi-array Average) Normalization ####
+# -------------------------------------------------------
+normalized_data <- rma(raw_data)
+
+# QC after data normalization 
+arrayQualityMetrics(expressionset = normalized_data[, c(14, 28, 37, 49, 58, 60, 65, 67, 71, 77, 86, 97, 101, 108, 115, 130)],
+                    outdir = "Results/QC_Normalized_Data",
+                    force = TRUE)
+arrayQualityMetrics(expressionset = normalized_data,
+                    outdir = "Results/QC_Normalized_Data",
+                    force = TRUE)
+# Extract normalized expression values into a data frame
+processed_data <- as.data.frame(exprs(normalized_data))
+dim(processed_data)   # Dimensions: number of probes × number of samples
+
+# ---------------------------------------------------------------------------
+#### Filter Low-Variance Transcripts (“soft” intensity based filtering) ####
+# ---------------------------------------------------------------------------
+# Filtering removes probes with low or uninformative expression signals.
+# Reason: Reduces noise and improves statistical power in differential expression & Machine Learning.
+
+# Calculate median intensity per probe across samples
+row_median <- rowMedians(as.matrix(processed_data))
+row_median
+
+#Plot the distribution of median intensities of probes#
+
+hist(row_median,
+     breaks = 100,
+     freq = FALSE,
+     main = "Median Intensity Distribution")
+# Set a threshold to remove low variance probes (dataset-specific, adjust accordingly)
+threshold <- 3.5 
+abline(v = threshold, col = "black", lwd = 2) 
+
+# Select probes above threshold
+indx <- row_median > threshold 
+filtered_data <- processed_data[indx, ] 
+View(feature_data)
+View(filtered_data)
+
+# Rename filtered expression data with sample metadata
+colnames(filtered_data) <- rownames(phenotype_data)
+
+# Overwrite processed data with filtered dataset
+processed_data <- filtered_data 
+
+# -----------------------------------
+#### Phenotype Data Preparation ####
+# -----------------------------------
+# Phenotype data contains sample-level metadata such as condition, 
+# tissue type, or disease status.
+# Required to define experimental groups for statistical analysis.
+
+class(phenotype_data$source_name_ch1) 
+
+# Define experimental groups (normal vs cancer)
+groups <- factor(phenotype_data$source_name_ch1,
+                 levels = c("gastric cancer"),
+                 label = c("normal", "cancer"))
+class(groups)
+levels(groups)
